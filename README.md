@@ -39,7 +39,7 @@ $p(a|x)$  为额外的一个「**特征分类器/attribute model**」，输入�
 
 
 ## p(a|x)
-![](https://blogapi.uber.com/wp-content/uploads/2022/08/image5-1-1.jpg)
+![](PPLM_img.jpeg)
 
 文本生成时，每个时间步都有一个隐状态 $H_t$ 和已生成序列 $x_t$ ，模型就是通过这两者生成输出 $o_t$ ，并且更新隐状态得到 $H_{t+1}$ ：
 $$
