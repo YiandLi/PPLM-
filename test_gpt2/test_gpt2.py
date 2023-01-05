@@ -11,7 +11,6 @@ print(inputs)
 
 generated = []
 past_key_values = None
-print("哭了")
 for i in range(10):
     # context 为每次迭代输入模型中的input_ids张量, 是一个字符或者序列
     # past_key_values 是历史 key/val 缓存
