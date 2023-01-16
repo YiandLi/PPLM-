@@ -17,9 +17,11 @@
 
 
 首先假设文本风格/属性为变量 $a$ ，模型生成的文本为 $x$ ，则「模型基于某个属性$a$ ，生成文本 $x$ 」可以表示为：
+
 $$
 p(x|a) \propto p(a|x)p(x)
 $$
+
 $p(x)$ 为文本的总体分布，即一个形式为 $p(X)=\prod_{i=1}^{n} p\left(x_{i} \mid x_{0}, \cdots, x_{i-1}\right)$ 的 **unconditional LM** ，比如 GPT2。
 $p(x|a)$ 为我们想得到的 **conditional LM**，即给定文本特征 $a$ ，该模型可以生成具有该特征的文本。
 $p(a|x)$  为额外的一个「**特征分类器/attribute model**」，输入文本，输出对应的风格。这个模型和语言模型相比，要小很多。
@@ -42,6 +44,7 @@ $p(a|x)$  为额外的一个「**特征分类器/attribute model**」，输入�
 ![](PPLM_img.jpeg)
 
 文本生成时，每个时间步都有一个隐状态 $H_t$ 和已生成序列 $x_t$ ，模型就是通过这两者生成输出 $o_t$ ，并且更新隐状态得到 $H_{t+1}$ ：
+
 $$
 o_{t+1}, H_{t+1}=\operatorname{LM}\left(x_{t}, H_{t}\right) \\
 x_{t+1} \sim p_{t+1}=\operatorname{Softmax}\left(W o_{t+1}\right)
@@ -49,10 +52,12 @@ $$
 
 而 $p(a|x)$ 在这的作用是，判断当前生成 $x_{t+1}$ 是否接近属性 $a$ 的需求。根据反馈，去修改之前的历史 $H_{t}$ 。
 每一个时间步，我们通过 $p(a|x)$ ，即一个判别模型，得到一个梯度，用于更新 $H_{t}$ ：
+
 $$
 \tilde{H}_{t}=H_{t}+\Delta H_{t} \\
 \widetilde{o}_{t+1}, H_{t+1}=\operatorname{LM}\left(x_{t}, \widetilde{H}_{t}\right)
 $$
+
 如果把 $H_{t}$ 看作历史知识，那就是先用历史知识计算 $p(a|x)$ 的损失，然后反过来更新 $H_{t}$ ，得到 $\tilde{H}_{t}$ ，最后用这个新的隐变量生成 token。
 
 <br>
@@ -61,9 +66,11 @@ $$
 
 **首先 $H$ 是什么 ？**
 论文中因为用的是 GPT2 语言模型，所以模型基本组件是 Transformer，所以历史隐状态 $H_t$ 为 **K-V pair 序列**：
+
 $$
 H_{t .}=\left[\left(K_{t}^{(1)}, V_{t}^{(1)}\right), \cdots,\left(K_{t}^{(l)}, V_{t}^{(l)}\right)\right]
 $$
+
 是一个序列形式， $(K_{t}^{(i)}, V_{t}^{(i)})$ 表示 第 $i$ 层的所有时间步 $[0,t]$ /所有token 的**K-V pair**。
 同时也只有这个变量，控制了下一个 token 的概率分布。
 为了提高计算效率，可以选择仅修改最近过去的某个窗口内的隐变量，如红色虚线区域所示。
@@ -74,9 +81,11 @@ $$
 **怎么求 $\Delta H_{t}$ ？**
 $\Delta H_{t}$ 为这一轮「文本隐状态 $H$ 」的改变量，则改变后「文本隐状态」变为 $\Delta H_{t}+H_{t}$ ，那么我们将判别模型 $p(a|x)$ 重写为 $p(a|H)$ （其实有点不严谨，但是也还好， $H_t$ 可以代表 $x_t$ ）。
 然后 $\Delta H_{t}$ 梯度更新的公式就是：
+
 $$
 \Delta H_{t} \leftarrow \Delta H_{t}+\alpha \frac{\nabla_{\Delta H_{t}} \log p\left(a \mid H_{t}+\Delta H_{t}\right)}{\left\|\nabla_{\Delta H_{t}} \log p\left(a \mid H_{t}+\Delta H_{t}\right)\right\|^{\gamma}}
 $$
+
 $\alpha$ 为学习率， $\gamma$ 为标准化的缩放系数， $\Delta H_{t}$ 初始化为0。
 这个更新步骤可以重复m次，通常取 [3,10] 。
 
@@ -89,7 +98,9 @@ $\alpha$ 为学习率， $\gamma$ 为标准化的缩放系数， $\Delta H_{t}$ 
 有两种方法：
 1. 最小化「更新后模型预测分布」和「原始模型预测分布」之间的KL散度，该项超参数设置为 0.01 效果不错。
 2. 融合修改前后的单词的输出概率（post-norm fusion），即
+
 $$x_{t+1} \sim \frac{1}{\beta}\left(\tilde{p}_{t+1}^{\gamma_{g m}} p_{t+1}^{1-\gamma_{g m}}\right)$$
+
 其中 ${p}_{t+1}$ 和 $\tilde{p}_{t+1}$ 是修改前后的词库概率分布。
 $\gamma_{g m} \rightarrow 1$ 表示收敛于更新后的分布，$\gamma_{g m} \rightarrow 0$ 表示收敛于无条件的语言模型分布。实验发现 $\gamma_{g m} \in [0.8, 0.95]$ 效果不错。
 
@@ -101,9 +112,11 @@ $\gamma_{g m} \rightarrow 1$ 表示收敛于更新后的分布，$\gamma_{g m} \
 
 没有额外参数
 针对每个主题先总结一批有代表性的词 $\{w_1,w_2...,w_n\}$ ，之后具体实现时只用在每个时间步上对输出概率分布取出对应词袋中词的对数似然分数：
+
 $$
 \log p(a \mid x)=\log \left(\sum_{i}^{k} p_{t+1}\left[w_{i}\right]\right)
 $$
+
 ，然后反向传播就行。方法虽然简单却意外有效。
 
 ### Simple discriminators
